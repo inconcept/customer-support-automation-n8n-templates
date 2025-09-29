@@ -1,0 +1,587 @@
+{
+  "name": "Customer Support Gmail inbox agent with RAG (Pinecone vector store)",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyHour"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "q": "-from:me is:unread"
+        },
+        "options": {}
+      },
+      "id": "5c40d912-113e-493c-8a1c-5e85a31594ce",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "position": [
+        112,
+        112
+      ],
+      "typeVersion": 1,
+      "credentials": {
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "53849246-ad32-4845-9976-9f9688f5a6f2",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "leftValue": "={{ $json.needsReply }}",
+              "rightValue": "true"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e5452448-cc01-4812-af7f-ceb8a158eef7",
+      "name": "If Needs Reply",
+      "type": "n8n-nodes-base.if",
+      "position": [
+        704,
+        112
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "jsonSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"needsReply\": {\n      \"type\": \"boolean\"\n      }\n  },\n  \"required\": [\"needsReply\"]\n}\n"
+      },
+      "id": "71366ea0-9a90-4279-90b2-b0db60da1380",
+      "name": "JSON Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "position": [
+        544,
+        256
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## Generate Reply using RAG (Agent)",
+        "height": 576,
+        "width": 493,
+        "color": 5
+      },
+      "id": "1c48c687-e33f-4f65-8e9f-0feffc1ce8a6",
+      "name": "Sticky Note2",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        896,
+        0
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "=Re: {{ $('Gmail Trigger').item.json.headers.subject }}",
+        "message": "={{ $json.output }}",
+        "options": {
+          "threadId": "={{ $('Gmail Trigger').item.json.threadId }}",
+          "sendTo": "={{ $('Gmail Trigger').item.json.headers.from }}"
+        }
+      },
+      "id": "ecb08ed7-6240-489f-913b-30f7de89bcff",
+      "name": "Gmail - Create Draft",
+      "type": "n8n-nodes-base.gmail",
+      "position": [
+        1504,
+        96
+      ],
+      "typeVersion": 2.1,
+      "webhookId": "e3ab3536-4cb4-4869-9fcd-8774903b33e5",
+      "credentials": {
+      }
+    },
+    {
+      "parameters": {
+        "content": "## On a new Email received\n",
+        "height": 410,
+        "width": 304,
+        "color": 5
+      },
+      "id": "9719045b-dc70-4e96-a1ce-326b2dab8079",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        0,
+        0
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Use this tool to look up past [COMPANY_NAME] support messages and replies.  \n• Input: a user’s message text.  \n• Action: run a similarity search over our indexed Q/A history.  \n• Output: a JSON array of up to 10 matching records.  \n  Each record has:\n    – email_subject  \n    – question  \n    – answer  \n\nCall this whenever you need context on how we answered a similar question before.",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "[PINECONE-INDEX]",
+          "mode": "list",
+          "cachedResultName": "[PINECONE-INDEX]"
+        },
+        "topK": 10,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        1104,
+        272
+      ],
+      "id": "8d39ce71-8775-4029-8abd-f84011cf5c30",
+      "name": "Pinecone Vector Store",
+      "credentials": {
+      }
+    },
+    {
+      "parameters": {
+        "prompt": "=Subject: {{ $json.subject }}\nMessage:\n{{ $json.text }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are an email triage assistant. Your job is to analyze the inbound email’s subject and body and decide if it’s a support request from a customer that needs a human-like reply.  \nReturn only JSON with a single boolean field needsReply:\n• true  → if it’s a real customer support question, bug report, billing issue, feature request, or any customer support email from a user.  \n• false → if it’s marketing, newsletters, automated alerts, spam, internal notifications, or anything that is not a customer support email from a user and does not require a response."
+            }
+          ]
+        }
+      },
+      "id": "e8566179-8699-4bf5-aea5-42620cd43839",
+      "name": "Filter Support-Relevant Emails",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "position": [
+        384,
+        80
+      ],
+      "typeVersion": 1.3
+    },
+    {
+      "parameters": {
+        "options": {
+          "dimensions": 1536
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1104,
+        416
+      ],
+      "id": "68269783-966e-4526-a6a6-f7245b537add",
+      "name": "Embeddings OpenAI Model",
+      "credentials": {
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Subject: {{ $('Gmail Trigger').item.json.headers.subject }}\nMessage: {{ $('Gmail Trigger').item.json.text }}\n",
+        "options": {
+          "systemMessage": "# You are [COMPANY_NAME]’s AI Support Agent. \nWhen given a new customer email fetch past answers:\n\nCall the “Pinecone Vector Store” tool with the customer’s message text.  \n  • The tool returns relevant past Q/A pairs.  \n  • Use those examples to draft a reply with clear formatting.  \n\nAlways:\n• Greet the user by name, look for the name in the email footer / signature section first.  \n• Reference [COMPANY_NAME]’s features or documentation when relevant.  \n• Sign off with “Best regards, [COMPANY_NAME] Support Team.”\n\n**IMPORTANT LAST STEP**\n• Format the reply for a Gmail draft (new-lines, spacings)\n• Compose a PLAIN TEXT\n• Do not use \"—\" symbol in the composed email\n• DO NOT INCLUDE SUBJECT, ONLY BODY"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        1008,
+        64
+      ],
+      "id": "20b95ce2-ab04-40ca-aa55-f96c34f40955",
+      "name": "Reply Generator agent"
+    },
+    {
+      "parameters": {
+        "content": "## Check if Email Needs a Support Reply",
+        "height": 410,
+        "width": 560,
+        "color": 5
+      },
+      "id": "60643754-27fb-4614-a124-0bc74f6c9acf",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        320,
+        0
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## Add generated reply as a Gmail Draft",
+        "height": 282,
+        "width": 304,
+        "color": 5
+      },
+      "id": "fe98ef46-39cf-48f7-aade-f4278de8061a",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1408,
+        0
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1vApHPMwhUuxT2PgXFJxGr3fO4Rt2rQdU016IVP9r-p0",
+          "mode": "list",
+          "cachedResultName": "Customer support agent generated relies",
+          "cachedResultUrl": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Customer support agent generated replies",
+          "cachedResultUrl": ""
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Thread ID": "={{ $('Gmail Trigger').item.json.threadId }}",
+            "Subject": "=Re: {{ $('Gmail Trigger').item.json.headers.subject }}",
+            "Date / Time": "={{ $('Gmail Trigger').item.json.date }}",
+            "User's email": "={{ $('Gmail Trigger').item.json.headers.from }}",
+            "User's message": "={{ $('Gmail Trigger').item.json.text }}",
+            "AI generated Reply": "={{ $json.output }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "User's email",
+              "displayName": "User's email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date / Time",
+              "displayName": "Date / Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "User's message",
+              "displayName": "User's message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "AI generated Reply",
+              "displayName": "AI generated Reply",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Subject",
+              "displayName": "Subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Thread ID",
+              "displayName": "Thread ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1504,
+        400
+      ],
+      "id": "025d4596-ec2a-42c2-8745-d902ca563a3e",
+      "name": "Append row in sheet",
+      "credentials": {
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Add Q/A pair to Google Sheets",
+        "height": 272,
+        "width": 301,
+        "color": 5
+      },
+      "id": "f7c715c2-ec28-4824-988d-7ac540529f32",
+      "name": "Sticky Note5",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1408,
+        304
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## Google sheet URL\n**[GOOGLE_SHEET_URL]**",
+        "height": 272,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1728,
+        304
+      ],
+      "typeVersion": 1,
+      "id": "f46a3330-19b7-4019-9a5c-9eef0d79f144",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "options": {
+          "responseFormat": "json_object"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        368,
+        256
+      ],
+      "id": "638c5a9f-5246-41b4-971e-77a0e41c9f90",
+      "name": "Filtering step model (gpt-5-mini)",
+      "credentials": {
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-mini-2025-08-07",
+          "mode": "list",
+          "cachedResultName": "gpt-5-mini-2025-08-07"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        960,
+        272
+      ],
+      "id": "4bf96103-9174-4b9f-9414-f51c8d85eb22",
+      "name": "Agent chat model (gpt-5-mini)",
+      "credentials": {
+      }
+    },
+    {
+      "parameters": {
+        "resource": "thread",
+        "operation": "addLabels",
+        "threadId": "={{ $json.message.threadId }}",
+        "labelIds": [
+          "Label_2807653093916118371"
+        ]
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1792,
+        96
+      ],
+      "id": "c459215d-e4d3-4117-be40-ea4d09412efc",
+      "name": "Add label to thread",
+      "webhookId": "c7ebd484-a7e8-4d2a-bc63-3e6835142fdb",
+      "credentials": {
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Add Gmail label",
+        "height": 282,
+        "color": 5
+      },
+      "id": "880ae7f0-303e-4aac-9dc5-a85b160361a0",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1728,
+        0
+      ],
+      "typeVersion": 1
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Filter Support-Relevant Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Needs Reply": {
+      "main": [
+        [
+          {
+            "node": "Reply Generator agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "JSON Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Filter Support-Relevant Emails",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone Vector Store": {
+      "ai_tool": [
+        [
+          {
+            "node": "Reply Generator agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Support-Relevant Emails": {
+      "main": [
+        [
+          {
+            "node": "If Needs Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI Model": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply Generator agent": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Create Draft",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtering step model (gpt-5-mini)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Filter Support-Relevant Emails",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent chat model (gpt-5-mini)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Reply Generator agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail - Create Draft": {
+      "main": [
+        [
+          {
+            "node": "Add label to thread",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "e7fYAt1iOzkvwIf1"
+  },
+  "versionId": "ac04fe19-e233-4474-8d4e-cb12c95571ca",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "610de85e2c53dd02c8323bd21204c773c3cbfe43e4ffe6a6b83488b7da7a3957"
+  },
+  "id": "e7fYAt1iOzkvwIf1",
+  "tags": []
+}

@@ -1,0 +1,344 @@
+{
+  "name": "Create Vector DB from Gmail inbox (Pinecone)",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {
+          "dimensions": 1536
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1056,
+        256
+      ],
+      "id": "27e5bbe2-2864-4f8e-951f-b95523c468ee",
+      "name": "Embeddings OpenAI1",
+      "credentials": {
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        32
+      ],
+      "id": "dcd1d7c4-0fab-45a3-bfbe-e9ff98b6aff1",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "[PINECONE-INDEX]",
+          "mode": "list",
+          "cachedResultName": "[PINECONE-INDEX]"
+        },
+        "embeddingBatchSize": 200000000,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        1088,
+        32
+      ],
+      "id": "e343d6d0-359e-44c1-b2cb-9d77a132aa4e",
+      "name": "Pinecone Vector Store",
+      "credentials": {
+      }
+    },
+    {
+      "parameters": {
+        "chunkSize": 100000
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        1264,
+        448
+      ],
+      "id": "19c4bfa6-1011-4041-adee-67b094345937",
+      "name": "Character Text Splitter"
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ \n  \"User’s message:\\n\\n\" \n  + $json.question \n  + \"\\n\\n##########\\n\\n\" \n  + \"Our Reply:\\n\\n\" \n  + $json.answer \n}}",
+        "textSplittingMode": "custom",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "email_subject",
+                "value": "={{ $json.subject }}"
+              },
+              {
+                "name": "=id",
+                "value": "={{ $json.conversation_id }}"
+              },
+              {
+                "name": "question",
+                "value": "={{ $('Decode message parts in the thread, cleanup and format into clean Question Answer').item.json.question }}"
+              },
+              {
+                "name": "answer",
+                "value": "={{ $('Decode message parts in the thread, cleanup and format into clean Question Answer').item.json.answer }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        1184,
+        256
+      ],
+      "id": "700b0695-33bf-43ed-8e0d-69730e286545",
+      "name": "Default Data Loader"
+    },
+    {
+      "parameters": {
+        "content": "## Get thread IDs of sent emails",
+        "height": 330,
+        "width": 432,
+        "color": 5
+      },
+      "id": "50095dfa-deaa-4a1c-96f3-2ef675a3071e",
+      "name": "Sticky Note4",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -128,
+        -80
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "resource": "thread",
+        "returnAll": true,
+        "filters": {
+          "labelIds": [
+            "SENT"
+          ],
+          "receivedAfter": "2022-01-01T00:00:00"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        144,
+        32
+      ],
+      "id": "d3a5d8a8-7044-44e2-9103-16d09326de1f",
+      "name": "Get thread IDs of sent emails",
+      "webhookId": "47496bf1-098b-485d-a21f-05cde968c9fc",
+      "credentials": {
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        384,
+        32
+      ],
+      "id": "37948bd8-c328-474e-a5de-21e72a9bae60",
+      "name": "Split into batches of 1 item each"
+    },
+    {
+      "parameters": {
+        "content": "## Get full thread info, decode parts, compose messages, cleanup and format into clean Q/A pairs\n",
+        "height": 330,
+        "width": 672,
+        "color": 5
+      },
+      "id": "662032cc-7136-415f-81dd-8b3e96bdb1cd",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        320,
+        -80
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "content": "## Encode / split into chunks / populate the Vector DB\n",
+        "height": 682,
+        "width": 464,
+        "color": 5
+      },
+      "id": "79140434-1187-47d5-8bdc-b976968c2c37",
+      "name": "Sticky Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1008,
+        -80
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "url": "=https://gmail.googleapis.com/gmail/v1/users/me/threads/{{ $json.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "format",
+              "value": "full"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        608,
+        32
+      ],
+      "id": "2ea0ec10-18bb-4d01-ac9f-374b62f113b7",
+      "name": "Get full thread request to Gmail API",
+      "credentials": {
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// @ts-ignore\nconst input = items;\nconst BufferRef = eval(\"Buffer\");\n\n/**\n * Decode Gmail’s Base64URL → Base64 → UTF-8\n */\nfunction gmailDecode(data) {\n  const b64 = data.replace(/-/g, '+').replace(/_/g, '/');\n  return BufferRef.from(b64, 'base64').toString('utf8');\n}\n\n/**\n * Recursively extract all text/plain parts from a MIME tree\n */\nfunction extractPlain(part) {\n  if (part.mimeType === 'text/plain' && part.body?.data) {\n    return gmailDecode(part.body.data);\n  }\n  if (part.parts) {\n    return part.parts.map(extractPlain).filter(Boolean).join('\\n');\n  }\n  return '';\n}\n\n/**\n * Clean quoted lines, signatures and boilerplate out of a text block\n */\nfunction cleanLines(text) {\n  return text\n    .split(/[\\r\\n]+/)\n    .filter(l =>\n      !l.startsWith('>') &&                   // quotes\n      !l.trim().startsWith('--') &&           // signature\n      !l.match(/^On\\s.+wrote:/) &&            // “On Wed… wrote:”\n      !l.match(/^Sent from my /i)             // mobile footers\n    )\n    .join('\\n')\n    .trim();\n}\n\n// Pull out full messages from the thread\nconst thread = input[0].json;\nconst messages = thread.messages.map(msg => {\n  const p = msg.payload;\n  let rawBody = '';\n\n  if (p.mimeType === 'text/plain' && p.body?.data) {\n    rawBody = gmailDecode(p.body.data);\n  } else {\n    rawBody = extractPlain(p);\n  }\n\n  const getHeader = name =>\n    (p.headers.find(h => h.name.toLowerCase() === name) || {}).value || '';\n\n  return {\n    id:        msg.id,\n    threadId:  msg.threadId,\n    from:      getHeader('from'),\n    subject:   getHeader('subject'),\n    date:      getHeader('date'),\n    body:      rawBody.trim(),\n  };\n});\n\n// Build Q/A pairs\nconst SUPPORT = 'support@company.online';\nconst userEmail = messages[0].from;\nconst threadId  = messages[0].threadId;\nconst subject   = messages[0].subject || '';\n\nconst qa = [];\nlet questionBuffer = [];\n\nfor (const m of messages) {\n  const isReply = m.from.toLowerCase().includes(SUPPORT);\n  if (!isReply) {\n    const clean = cleanLines(m.body);\n    if (clean) questionBuffer.push(clean);\n  } else {\n    const answerClean = cleanLines(m.body);\n    qa.push({\n      json: {\n        conversation_id: threadId,\n        subject,\n        user_email: userEmail,\n        question: questionBuffer.join('\\n\\n'),\n        answer:   answerClean,\n        timestamp: m.date,\n      }\n    });\n    questionBuffer = [];\n  }\n}\n\nreturn qa;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        32
+      ],
+      "id": "c94afd09-3eb3-4ce5-a913-bc9a26095a94",
+      "name": "Decode message parts in the thread, cleanup and format into clean Question Answer"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Embeddings OpenAI1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get thread IDs of sent emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone Vector Store": {
+      "main": [
+        [
+          {
+            "node": "Split into batches of 1 item each",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get thread IDs of sent emails": {
+      "main": [
+        [
+          {
+            "node": "Split into batches of 1 item each",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split into batches of 1 item each": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Get full thread request to Gmail API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get full thread request to Gmail API": {
+      "main": [
+        [
+          {
+            "node": "Decode message parts in the thread, cleanup and format into clean Question Answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decode message parts in the thread, cleanup and format into clean Question Answer": {
+      "main": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "461b8214-d994-446b-80d9-86cc90d2fcda",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "610de85e2c53dd02c8323bd21204c773c3cbfe43e4ffe6a6b83488b7da7a3957"
+  },
+  "id": "iBsVR8oOFjKxQVnQ",
+  "tags": []
+}
